@@ -1,0 +1,393 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+  <title>Model 2.5 implementation at SCK</title>
+                                                       
+  <meta name="author" content="Federico Canton">
+                               
+  <meta name="description"
+ content="Description of how Model 2.5 is being implemented at SCK">
+</head>
+  <body>
+               
+<h1 align="center"><tt>UCLA Center for Vaccine Research (SCK) Implementation
+    of Model 2.5<br>
+        </tt></h1>
+               
+<h2><tt><big>Table of Contents</big></tt></h2>
+               
+<h3><tt><big>&nbsp;&nbsp;&nbsp; A.&nbsp;&nbsp;&nbsp; <a
+ href="#A._Introduction_">Introduction</a></big></tt></h3>
+               
+<h3><tt><big>&nbsp;&nbsp;&nbsp; B.&nbsp;&nbsp;&nbsp; <a
+ href="#B._Details_">Details</a></big></tt></h3>
+               
+<h3><tt><big>&nbsp;&nbsp;&nbsp; C.&nbsp;&nbsp;&nbsp; <a
+ href="#C._Setup_">Setup</a></big></tt></h3>
+        <tt><br>
+        </tt>        
+<h3><tt><a name="A._Introduction_"></a><big>&nbsp;&nbsp;&nbsp; <big><b>A.
+    Introduction</b></big></big></tt></h3>
+        <tt>Model 2.5 is a system whereby SAS programmers can submit to the 
+ CDC   SAS jobs to be run on data located in remote sites. To this end the 
+ CDC has  made available an FTP server for programmers to upload their SAS 
+ jobs. The  SAS jobs are usually accompanied by a RUN file that contains the
+ order in  which the SAS jobs are to be executed. Each site that houses data
+ implements   a system to periodically check the CDC FTP server for new job
+ submissions   waiting to be processed, download the SAS jobs, and process
+ them. Each site   also implements a series of cross-site compatible SAS
+macros  to aid the programmers  in the process of creating new libraries, 
+sending  email notifications, and  uploading files back to the CDC FTP server, 
+among  other tasks.<br>
+        <br>
+        This paper describes how SCK implemented its system for checking
+the   CDC  FTP server and processing job submissions. SCK has a Windows 2000
+based   system  with a script scheduled to check the CDC FTP server at one
+hour intervals.   If the script finds that there are new files in the FTP
+server, it will download  them and launch a different script to process the
+files. The script that processes the downloads, reads the RUN files and executes 
+the SAS jobs in the proper order. SCK has also in place the SAS macros that 
+programmers can use in their jobs. These cross-site SAS macros are based 90%
+on the original  macros the CDC provided to SCK, and the %10 difference is
+transparent to the programmers. &nbsp;The changes were made in order to accommodate
+ the differences between Windows and UNIX environments, as UNIX was the original
+  environment used to develop the macros.<br>
+        <br>
+        Accompanying this document are all the scripts, SAS files, and file
+ system   structures used to implement Model 2.5 at SCK. For each script
+there  are  two versions: one in VBScript and other in Perl Script.<br>
+        <br>
+        </tt>        
+<h3><tt><a name="B._Details_"></a></tt><tt><big>&nbsp;&nbsp;&nbsp; <big><b>B.
+    Details</b></big></big></tt></h3>
+        <tt>&nbsp;&nbsp;&nbsp; SCK implementation of Model 2.5 consists of
+ the   following:<br>
+        </tt>        
+<ol>
+          <li><tt>A script called <b>GetFiles.wsf</b> (<a
+ href="rsub/vbs.getFiles.wsf.txt" target="_blank">vbs</a>  or <a
+ href="rsub/perl.getfiles.wsf.txt" target="_blank">perl</a>) that periodically 
+logs into the CDC FTP server and gets a listing of its files. If the script 
+finds new SAS jobs, it will:&nbsp;</tt></li>
+                               
+  <ol type="a">
+            <li><tt>download the new SAS or RUN files into a new, time-coded
+ folder,</tt></li>
+            <li><tt>launch a different script that will process the downloads,</tt></li>
+            <li><tt>send an email to the system administrator with information
+   about  the files downloaded, and</tt></li>
+            <li><tt>exit.</tt></li>
+                               
+  </ol>
+               
+</ol>
+               
+<blockquote><tt>The script will not download files with suffixes other than
+    .sas or .run. If the script does not find new files in the FTP server,
+ it  will send an email to the system administrator reporting that there
+were no new files to download. The script launches    a different script
+to process the SAS jobs to be able to exit and be ready    for the next check
+of the FTP server.<br>
+          </tt></blockquote>
+               
+<ol start="2">
+          <li><tt>A script called <b>ProcessJobs.wsf</b> (<a
+ href="rsub/vbs.ProcessJobs.wsf.txt" target="_blank">vbs</a>  or <a
+ href="rsub/perl.ProcessJobs.wsf.txt" target="_blank">perl</a>)  that processes 
+all the downloaded   SAS jobs. When the GetFiles script launches the ProcessJobs 
+script, it passes   to the ProcessJobs script, as an argument, the name of 
+the time-stamped folder  where the SAS jobs where downloaded. The ProcessJobs 
+script will:</tt></li>
+                               
+  <ol type="a">
+            <li><tt>Process all the RUN files.</tt></li>
+           <li><tt>For each RUN file, the script will </tt><tt>sequentially</tt><tt> 
+   run all the jobs included, starting with the first job  listed.</tt></li>
+            <li><tt>For each SAS job it runs, the script will pass, as a
+command    line argument, a SAS autoexec file called <a
+ href="rsub/START.SAS.txt" target="_blank">START.SAS</a>.    This file includes 
+a LIBNAME statement for the compiled cross-site SAS macros.</tt></li>
+            <li><tt>The script will make sure that every SAS file has been
+ processed.   After the script finishes with the RUN files, it will run every
+ SAS fine  that was downloaded but not included in any of the RUN files.</tt></li>
+            <li><tt>Lastly, the script will send the system administrator 
+an  email   reporting</tt></li>
+                                               
+    <ol type="i">
+              <li><tt>the total number of SAS jobs processed,</tt></li>
+              <li><tt>how many of these jobs were included in RUN files,</tt></li>
+              <li><tt>how many of the jobs were not included in the RUN 
+files,   and</tt></li>
+              <li><tt>any errors that occurred, for example, a SAS job that 
+ was   included in a RUN file but that was not included for download.</tt></li>
+                                               
+    </ol>
+                               
+  </ol>
+               
+</ol>
+               
+<ol start="3">
+          <li><tt>SCK also implements the cross-site SAS macros. The definitions 
+   for these macros are contained in the file called <a
+ href="rsub/smacro1.sas.txt" target="_blank">smacro1.sas</a>. Every programmer 
+can use the   macros to work with the data residing in remote sites. For the
+most part&nbsp;</tt><tt>SCK</tt><tt>'s   macro definition file is the same
+the CDC provided. The file was originally   developed on UNIX environment, 
+so some modifications where necessary to make  it compatible with our Windows 
+environment. In modifying the macros the highest  priority was to maintain 
+the way the macros where called,  so that programmers would not have to use 
+the macros differently at SCK. Further, all the path variables contained in
+the original macro file were maintained; only their UNIX syntax was changed. 
+In  our implementation the equivalent to the UNIX root directory is the C:\ 
+drive.  Other than mere path syntax changes, we changed only three macros:<br>
+            </tt></li>
+               
+</ol>
+        <tt><b>&nbsp;&nbsp;&nbsp; ML Macro</b><br>
+        </tt>        
+<blockquote><tt>The macro that changed the most was the ML macro. This macro 
+   is used to send email notifications from within SAS jobs. In our environment 
+   we noticed that every time the ML macro was called a window popped-up. 
+The   window alerted the user that a third party program was accessing the 
+mail   system. As the window required user intervention, the SAS jobs that 
+used  the ML macro could not exit automatically. To get around this problem, 
+instead   of using SAS email facility, the ML macro uses a script called 
+ <b>sendmail.wsf</b>   (<a
+ href="export/home1/eml/rst/vbs.sendmail.wsf.txt" target="_blank">vbs</a> 
+or <a href="export/home1/eml/rst/perl.sendmail.wsf.txt" target="_blank">perl</a>). 
+When the ML    macro is called, it will use the MAKEFILE macro to write the 
+contents of   the subject variable into a file called subject.txt. Then, the
+macro will   launch the sendmail script and pass to it the email acronym as
+an argument.    Next, the sendmail script will read the contents of subject.txt, 
+map the   acronym to the appropriate email address and send the email. The 
+way the  programmer calls the macro did not change; only the way the macro 
+carries   out the task of sending the email.<br>
+          </tt></blockquote>
+        <tt><b>&nbsp;&nbsp;&nbsp; PUTFILE Macro</b><br>
+        </tt>        
+<blockquote><tt>This macro allows programmers to upload files onto the CDC
+    FTP server from within their SAS jobs. The only change made to this macro 
+   was to add "options noxwait" before the system call. This way the command 
+   window exits automatically after executing the system call. We supplied 
+ the  system script the macro uses to upload the files onto the FTP server. 
+ The  script is called <b>snd.wsf</b> (<a
+ href="export/home1/eml/rst/vbs.snd.wsf.txt" target="_blank">vbs</a> or <a
+ href="export/home1/eml/rst/perl.snd.wsf.txt" target="_blank">perl</a>). The
+script takes    the filename and path as its only argument, and after successfully
+uploading    the file, it moves the file to a time-stamped folder.<br>
+          </tt></blockquote>
+        <tt><b>&nbsp;&nbsp;&nbsp; MAKEFILE Macro</b><br>
+        </tt>        
+<blockquote><tt>This macro allows the programmers to create files within
+their SAS jobs. When we first tested this macro, the files were being placed
+at the root of the C:\ drive. We changed value of the variable at line 5
+of the macro to c:\sastemp. This way the files are created in the c:\sastemp 
+   directory.<br>
+          </tt></blockquote>
+        <tt><br>
+        </tt>        
+<h3><tt><a name="C._Setup_"></a></tt><tt>&nbsp;&nbsp;&nbsp; <big><big>C. Setup</big></big></tt></h3>
+        <tt>To setup a server for Model 2.5 a system administrator should 
+follow    these steps: a) Change the appropriate variables in the scripts. 
+b) Configure    the server so that it can run the scripts. c) Setup the file 
+system so that   the scripts and SAS macros can run. d) Run the SAS file containing
+the macro   definitions. And e) Schedule the GetFiles script to run at regular
+ intervals.<br>
+        <br>
+        <b>&nbsp;&nbsp;&nbsp; a) Change the appropriate variables in the
+scripts.</b><br>
+       </tt>       
+<blockquote><tt> For the scripts to work the variables indicating the username 
+   and password for the CDC FTP server have to be modified to reflect the 
+site's   own credentials. Other variables such as smpt server name, email 
+sender,  and email recipient (for the script's email report portions) have
+ to be adjusted too. Each script has comments indicating what variables (with
+  line numbers) have to be changed. &nbsp;(Note: The included scripts have
+to be renamed before they can work. &nbsp;The suffix ".txt" and the prefix
+"vbs." or "perl." have to be removed.)</tt></blockquote>
+       <tt><b>&nbsp;&nbsp;&nbsp; b) Configuring the server to run the scripts.</b><br>
+       </tt>       
+<blockquote><tt> Depending on what scripting language the system administrator 
+   wishes to use and what operating system the server is running, different 
+  components might need to be installed.</tt></blockquote>
+       <tt>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; <b>VBScript Requirements</b><br>
+       </tt>       
+<blockquote>                     
+  <blockquote><tt>If VBScripts will be used, the server needs to run Windows 
+   2000, as the VBScripts contain features not compatible with Windows NT. 
+ Also,  the latest Windows Scripting Engine should be installed on the server. 
+ The  latest version of the script engine right now is Windows Script Host 
+ 5.6.  The installation file can be downloaded from this page:</tt></blockquote>
+       </blockquote>
+             
+<blockquote>                     
+  <blockquote><tt><a
+ href="http://www.microsoft.com/downloads/details.aspx?FamilyID=c717d943-7e4b-4622-86eb-95a22b832caa&amp;DisplayLang=en"
+ target="_blank">    Windows Script 5.6 for Windows 2000</a></tt><tt><br>
+           </tt></blockquote>
+       </blockquote>
+             
+<blockquote>                     
+  <blockquote><tt> Furthermore, the VBScripts that access the FTP server rely
+on a custom dll to be able to create FTP objects. The dll is called cvrftp.dll,
+and it is located in the included folder called uclacvr_ftpdll. In order
+for it to work, the dll file has to be registered in the operating system.
+To register the dll the system administrator can simply run the batch file
+called registerdll.bat, included in the same folder. Another way to register
+   the dll is to start a command session, CD into the uclacvr_ftpdll directory
+   and run "regsvr32 cvrftp.dll".</tt></blockquote>
+       </blockquote>
+       <tt>&nbsp;&nbsp;&nbsp; <b>&nbsp;&nbsp;&nbsp; Perl Script Requirements</b><br>
+       </tt>       
+<blockquote>                     
+  <blockquote><tt> If perl scripts will be used, ActivePerl has to be installed 
+   in the system. (The perl scripts run in both Windows 2000 and NT servers.) 
+   ActivePerl can be downloaded form this page:</tt><tt><br>
+           <br>
+     </tt>          <tt> <a
+ href="http://www.activestate.com/Products/Download/Download.plex?id=ActivePerl"
+ target="_blank">ActivePerl    5.8.0 build 806</a><br>
+     </tt>          <tt> <br>
+     </tt>          <tt> Preferably the MSI package should be downloaded
+and installed,   but some Windows installations cannot use the MSI package
+because they have   out-dated  versions of the Microsoft Windows Installer.
+To solve this problem   the latest version of Windows Installer should be
+installed. The latest version  can be downloaded from this page:<br>
+     </tt>          <tt> <br>
+     </tt>          <tt> <a
+ href="http://www.microsoft.com/downloads/details.aspx?FamilyID=4b6140f9-2d36-4977-8fa1-6f8a0f5dca8f&amp;DisplayLang=en"
+ target="_blank">Windows    Installer 2.0</a><br>
+     </tt>        </blockquote>
+       </blockquote>
+       <tt> <br>
+        <b>&nbsp;&nbsp;&nbsp; c) Setup the file system so that the scripts
+ and   SAS macros can run.</b><br>
+       </tt>       
+<blockquote><tt> The scripts and macros refer to files and folders in predefined 
+   locations of the file system, so the server's file system must have   
+the folder hierarchy the scripts require. There should be three folders 
+in  the C:\ drive: </tt><tt>C:\</tt><tt>export, </tt><tt>C:\</tt><tt>rsub 
+ and    </tt><tt>C:\</tt><tt>sastemp. This is the file tree for these folders 
+ showing  the files contained in each of them:<br>
+   </tt>        <tt> <br>
+   </tt>        <tt> +---export<br>
+   </tt>        <tt> |&nbsp;&nbsp; +---cdc<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; +---cycle8<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; |&nbsp;&nbsp; +---adult<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; |&nbsp;&nbsp; \---youth<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; +---cycle9<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; |&nbsp;&nbsp; +---adult<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; |&nbsp;&nbsp; \---youth<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; +---storea<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; \---vsd2001<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---adult<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
++---allages<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+\---youth<br>
+   </tt>        <tt> |&nbsp;&nbsp; +---home1<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; \---eml<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+\---rst<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; sendmail.wsf<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; snd.wsf<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    \---vsdcat<br>
+   </tt>        <tt> |&nbsp;&nbsp; \---lstor<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; \---eml<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+ \---cdc<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    +---tmpbase<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per1<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per2<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per3<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per4<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per5<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---per6<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---tmp1<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---tmp2<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---tmp3<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---tmp4<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; +---tmp5<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    |&nbsp;&nbsp; \---tmp6<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    +---vsdbase<br>
+   </tt>        <tt> |&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    \---xptbase<br>
+   </tt>        <tt> +---rsub<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; Getfiles.wsf<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; ProcessJobs.wsf<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; smacro1.sas<br>
+   </tt>        <tt> |&nbsp;&nbsp; |&nbsp;&nbsp; START.SAS<br>
+   </tt>        <tt> |&nbsp;&nbsp; |<br>
+   </tt>        <tt> |&nbsp;&nbsp; +---downloads <br>
+   </tt>        <tt> |&nbsp;&nbsp; \---processed<br>
+   </tt>        <tt> +---sastemp <br>
+   </tt>        <tt> <br>
+   </tt>        <tt> The scripts used by the SAS macros go into the C:\export\home1\eml\rst 
+   folder. The scripts to download and process the SAS jobs go into the C:\rsub
+    folder. The&nbsp;</tt><tt>time-coded</tt><tt> folders for the new SAS 
+jobs are created inside the c:\rsub\downloads folder, and uploaded files are
+moved to time-coded folders inside the c:\rsub\processed folder. To create 
+this file structure simply copy the enclosed folders into  the server's C:\ 
+drive. The folder containing the dll can be placed in any  location, but it
+has to remain in that location after the dll has been registered  or the dll
+will stop working. The&nbsp;</tt><tt>smacro1.sas</tt><tt> file  can be placed
+anywhere. </tt><tt><br>
+        </tt></blockquote>
+       <tt>&nbsp;&nbsp;&nbsp; <b>d) Run the SAS file containing the macro 
+definitions.</b><br>
+       </tt>       
+<blockquote><tt> After the file system has been set, run the </tt><tt>smacro1.sas. 
+   Running this file creates the compiled SAS macro files (address1.sas7bdat, 
+   libasgn.sas7bdat and sasmacr.sas7bcat) in the C:\export\home1\eml\rst\vsdcat 
+   folder. This folder path is used by the LIBNAME statement of the START.SAS 
+   file.</tt><tt><br>
+        </tt></blockquote>
+       <tt>&nbsp;&nbsp;&nbsp; <b>e) Schedule the GetFiles script to run at
+ regular    interval.</b><br>
+       </tt>       
+<blockquote><tt> Once all previous steps have been completed, add a system 
+   scheduled tasks to run the GetFiles script at regular intervals. This can
+   be accomplished by using the AT command or by using the "Scheduled Tasks"
+   program located in Start | Programs | Accessories | Tools.<br>
+   </tt>      </blockquote>
+       <tt> <br>
+        &nbsp;&nbsp;&nbsp; <big><big><b>Conclusion</b></big></big><br>
+        <br>
+        This is how Model 2.5 was implemented at SCK. If you have any questions 
+   or comments, please direct them to:<br>
+        <br>
+        <a href="mailto:fc@bcc.bz?subject=SCK%20Model%202.5">
+            Federico
+            Cant&oacute;n<br>
+            Manager Information Systems<br>
+            UCLA Center for Vaccine Research
+        </a><br>
+        <br>
+        <br>
+        <br>
+ <br>
+ <br>
+ </tt>                    <br>
+</body>
+</html>
